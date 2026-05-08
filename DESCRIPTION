@@ -26,3 +26,5 @@ Depends:
     ggplot2,
     dplyr
 RoxygenNote: 7.3.3
+URL: https://github.com/flewleaves/seqTools
+BugReports: https://github.com/flewleaves/seqTools/issues
