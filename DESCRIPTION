@@ -1,7 +1,7 @@
 Package: seqTools
 Type: Package
 Title: Tools for analyzing common sequencing data.
-Version: 0.1.13
+Version: 0.1.14
 Authors@R: c(
     person(
       "Flyingleaf",
@@ -19,7 +19,8 @@ Imports:
     limma,
     parallel,
     stats,
-    ggraph
+    ggraph,
+    geneSync
 Depends: 
     R (>= 3.5),
     Seurat,
