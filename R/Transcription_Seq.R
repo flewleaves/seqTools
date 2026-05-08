@@ -245,7 +245,7 @@ DEG_analysis <- function(
 #' @param geneList A named geneList including the ranking metrics of all genes with names the gene name
 #' @param genesets The geneset for GSEA analysis. Can be common genesets including "GO", "KEGG", "Reactome", or custom gmtfile.
 #' @param species "Hs" for human and "Mm" for mouse.
-#' @param input_datatype The gene format of the input data.
+#' @param from The gene format of the input data.
 #' @param p.value The cut off of GSEA analysis.
 #' @param minGSSize The minimum geneset size for analysis.
 #' @param maxGSSize The maximum geneset size for analysis.
@@ -258,7 +258,7 @@ quick_GSEA <- function(
   geneList,
   genesets = "GO",
   species,
-  input_datatype,
+  from,
   p.value = 0.05,
   minGSSize = 10,
   maxGSSize = 500
@@ -268,12 +268,12 @@ quick_GSEA <- function(
   }
 
   if (class(genesets) != "character") {
-    if (input_datatype != "SYMBOL") {
+    if (from != "SYMBOL") {
       names(geneList) <- Quick_ID_conversion(
         names(geneList),
         species = species,
-        input_datatype = input_datatype,
-        target_datatype = "SYMBOL",
+        from = from,
+        to = "SYMBOL",
         matrix = F
       )
     }
@@ -283,12 +283,12 @@ quick_GSEA <- function(
       pvalueCutoff = p.value
     )
   } else {
-    if (input_datatype != "ENTREZID") {
+    if (from != "ENTREZID") {
       names(geneList) <- Quick_ID_conversion(
         names(geneList),
         species = species,
-        input_datatype = input_datatype,
-        target_datatype = "ENTREZID",
+        from = from,
+        to = "ENTREZID",
         matrix = F
       )
     }
@@ -336,7 +336,7 @@ quick_GSEA <- function(
 #' @param geneList A geneList including names of significant differentially expressed genes
 #' @param genesets The geneset for enrich analysis. Can be "GO", "KEGG", and "Reactome"
 #' @param species "Hs" for human and "Mm" for mouse.
-#' @param input_datatype The gene format of the input data.
+#' @param from The gene format of the input data.
 #' @param universe The background geneset for ORA analysis.
 #' @param q.value The cut off adjusted p for enrich analysis.
 #' @param minGSSize The minimum geneset size for analysis.
@@ -350,7 +350,7 @@ quick_enrich <- function(
   geneList,
   genesets = "GO",
   species,
-  input_datatype,
+  from,
   universe = NULL,
   p.value = 0.05,
   minGSSize = 10,
@@ -360,19 +360,19 @@ quick_enrich <- function(
     stop("genes in the geneList should be part of the universe genes")
   }
 
-  if (input_datatype != "ENTREZID") {
+  if (from != "ENTREZID") {
     geneList <- Quick_ID_conversion(
       geneList,
       species = species,
-      input_datatype = input_datatype,
-      target_datatype = "ENTREZID",
+      from = from,
+      to = "ENTREZID",
       matrix = F
     )
     universe <- Quick_ID_conversion(
       universe,
       species = species,
-      input_datatype = input_datatype,
-      target_datatype = "ENTREZID",
+      from = from,
+      to = "ENTREZID",
       matrix = F
     )
   }
@@ -430,7 +430,7 @@ quick_enrich <- function(
 #' @param method Can be "cpm", "rpkm", "tpm", "tmm" or "vst/rlog".
 #' @param species "Hs" for human and "Mm" for mouse. Only works when gene.length = NULL.
 #' @param group Used for vst and tmm method.
-#' @param input_datatype The gene format of the input data. Only works when gene.length = NULL.
+#' @param from The gene format of the input data. Only works when gene.length = NULL.
 #' @param gene.length The length of genes that required to be normalized. If NULL, use internal data to get gene length.
 #'
 #' @returns
@@ -490,15 +490,15 @@ normalization <- function(countData, method, group = NULL, gene.length = NULL) {
 }
 
 #' To get gene.length from hg39 when the RNAseq length info is missing (not recommended)
-get_standard_gene_length <- function(countData, species, input_datatype) {
+get_standard_gene_length <- function(countData, species, from) {
   geneid_efflen <- if (species == "Mm") Mm_ref else Hs_ref
   colnames(geneid_efflen)[1] <- "Geneid"
-  if (input_datatype != "ENSEMBL") {
+  if (from != "ENSEMBL") {
     geneid_efflen <- Quick_ID_conversion(
       geneid_efflen,
       species = species,
-      input_datatype = "ENSEMBL",
-      target_datatype = input_datatype,
+      from = "ENSEMBL",
+      to = from,
       matrix = T
     )
   }
