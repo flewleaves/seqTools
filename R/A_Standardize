@@ -1,0 +1,254 @@
+standardize_expr <- function(expr){
+
+    
+
+
+
+}
+
+get_expr_info <- function(expr, species = NULL, type = NULL, Gene_column = NULL, Gene_feature = NULL, Sample_columns = NULL){
+    info <- list(species = species, type = type, Gene_column = Gene_column, Gene_feature = Gene_feature,Sample_columns = Sample_columns)
+    ty <- sapply(df, typeof)
+    g <- expr[,ty == "character", drop = FALSE]
+    c <- expr[,ty == "numeric", drop = FALSE]
+    if(ncol(g) == 0 | ncol(c) == 0) stop("Gene column or expression data is not found.")
+    ge <- .get_gene_column(g)
+    if(is.null(ge[[1]])) stop("Gene column is not detected.")
+    if(is.null(info[["species"]])) info[["species"]] <- ge[[2]]
+    if(is.null(info[["Gene_column"]])) info[["Gene_column"]] <- ge[[1]]
+    if(is.null(info[["Gene_feature"]])) info[["Gene_feature"]] <- ge[[3]]
+    
+    
+}
+
+
+#' @keywords internal
+.get_gene_column <- function(g){
+      size <- sqrt(nrow(g))
+      pa <- list(
+          hsymbol = "^[A-Z][A-Z0-9-]+$",  
+          msymbol = "^[A-Z][a-z0-9-]+$",  
+          hensembl = "^ENSG[0-9]{11}(\\.[0-9]+)?$",  
+          mensembl = "^ENSMUSG[0-9]{11}(\\.[0-9]+)?$"          
+          entrez = "^[0-9]+$"                   
+      )
+      info <- list(index = NULL, species = NULL, feature = NULL)
+      for(i in 1:ncol(g)){
+          col <- g[,i, drop = TRUE]
+          sam <- sample(col, size)
+          for(j in 1:5){
+              s <-  mean(grepl(list[[j]], genes, perl = TRUE), na.rm = TRUE)
+              if(s > 0.9){
+                  info[[1]] <- colnames(g)[i]
+                  info[[2]] <- ifelse(j%%2 == 0, "Mm", ifelse(j == 5, NULL, "Hs"))
+                  if(j == 1|j == 2){
+                    info[[3]] <- "SYMBOL"
+                    return(info)
+                  }else if(j == 3| j == 4){
+                    info[[3]] <- "ENSEMBL"
+                  }else{
+                    info[[3]] <- "ENTREZID"
+                  } 
+              } 
+          }
+      }
+      return(info)
+}
+
+#' @keywords internal
+.get_sample_info <- function(c){
+   
+}
+
+
+
+
+
+
+
+
+
+#' @keywords internal
+matrix_ID_conversion <- function(
+  countData,
+  species,
+  input_datatype,
+  target_datatype,
+  to_rownames
+) {
+  if (species == "Mm") {
+    conversion <- AnnotationDbi::select(
+      org.Mm.eg.db::org.Mm.eg.db,
+      keys = countData$Geneid,
+      keytype = input_datatype,
+      column = target_datatype
+    )
+  } else if (species == "Hs") {
+    conversion <- AnnotationDbi::select(
+      org.Hs.eg.db::org.Hs.eg.db,
+      keys = countData$Geneid,
+      keytype = input_datatype,
+      column = target_datatype
+    )
+  } else {
+    stop("Such species is not supported")
+  }
+
+  countData <- merge(
+    countData,
+    conversion,
+    by.x = "Geneid",
+    by.y = input_datatype,
+    all = TRUE
+  )
+  countData <- subset(countData, select = -c(Geneid))
+  countData <- na.omit(countData)
+
+  pos <- which(colnames(countData) == target_datatype)
+
+  colnames(countData)[pos] <- "Geneid"
+
+  if (to_rownames) {
+    if (TRUE %in% duplicated(na.omit(countData$Geneid))) {
+      print("There are duplicated values: aggregating...")
+      countData <- remove_dup(countData, index = "Geneid", method = "kmax")
+    }
+
+    row.names(countData) <- countData$Geneid
+    countData$Geneid <- NULL
+  }
+
+  return(countData)
+}
+
+#' Convert Gene ID Conveniently
+#'
+#' @param geneList A vector of gene ids or a matrix contains a column of gene ids named "Geneid".
+#' @param species A string denotes the species. "Hs" for human and "Mm" for mouse.
+#' @param input_datatype A string denotes the id type in the geneList.
+#' @param target_datatype A string denotes the target id type.
+#' @param matrix A logical value denotes whether the geneList is a matrix. TRUE if geneList is a matrix.
+#' @param single_mapping A logical value denotes whether one input gene id is mapped to only one target gene id, even though it has several alias. Default to be true.
+#' @param to_rownames For matrix = TRUE only. A logical value denotes whether the converted ids are rownames of the resultant matrix. If rownames are duplicated, the resultant row takes the mean value.
+#'
+#' @returns A vector or matrix.
+#' @export
+#'
+#' @examples
+#' SYMBOL <- Quick_ID_conversion(ENTREZID, species = "Mm", input_datatype = "ENTREZID", target_datatype = "SYMBOL", matrix = F, single_mapping = T, to_rownames = F)
+Quick_ID_conversion <- function(
+  geneList,
+  species,
+  input_datatype,
+  target_datatype,
+  matrix = F,
+  single_mapping = T,
+  to_rownames = F
+) {
+  if (matrix) {
+    return(matrix_ID_conversion(
+      geneList,
+      species,
+      input_datatype,
+      target_datatype,
+      to_rownames
+    ))
+  }
+
+  if (species == "Mm") {
+    conversion <- AnnotationDbi::select(
+      org.Mm.eg.db::org.Mm.eg.db,
+      keys = geneList,
+      keytype = input_datatype,
+      column = target_datatype
+    )
+  } else if (species == "Hs") {
+    conversion <- AnnotationDbi::select(
+      org.Hs.eg.db::org.Hs.eg.db,
+      keys = geneList,
+      keytype = input_datatype,
+      column = target_datatype
+    )
+  } else {
+    stop("Such species is not supported")
+  }
+
+  if (single_mapping) {
+    conversion <- conversion[match(geneList, conversion[, 1]), ]
+  } else {
+    conversion <- split(x = conversion[, 2], f = as.factor(conversion[, 1]))
+    conversion <- lapply(conversion, function(x) {
+      paste(x, collapse = ";")
+    })
+    conversion <- data.frame(
+      names(conversion),
+      sapply(conversion, function(x) {
+        x[1]
+      })
+    )
+  }
+
+  return(conversion[, 2])
+}
+
+
+Quick_ID_conversion_v2 <- function(data, species, from, to, input_datatype = NULL, target_datatype = NULL, matrix = F, single_mapping = T, to_rownames = F){
+
+    if (!(is.null(input_datatype) & is.null(target_datatype))) {
+    # 发出弃用警告
+    lifecycle::deprecate_warn(
+      when = "0.1.14",           # 哪个版本开始弃用
+      what = "Quick_ID_conversion_v2(input_datatype, target_datatype)",  # 弃用的东西
+      with = "Quick_ID_conversion_v2(from, to)"   # 推荐替代方案（可选）
+    )
+    from <- input_datatype # 兼容旧代码
+    to <- target_datatype
+  }
+} 
+
+
+
+#' Remove duplicated gene in the expression matrix
+#'
+#' @param expr The expression matrix. 
+#' @param index The column index of the gene. 
+#' @param method The method to remove duplication. "max" takes the maximum for each value in duplicated row and combine them together. "mean" takes the mean. "kmax" keeps the row with the maximum sum (it will not change the raw data in the row).  
+#'
+#' @returns
+#'
+#' @export
+#' @examples
+remove_dup <- function(expr, index, method = "max") {
+    if(!method %in% c("max", "mean", "kmax")){
+      stop("Error: this method is not supported.")
+    }
+  
+    if(is.numeric(index)){
+      index <- colnames(expr)[index]
+    } 
+    
+    g <- expr[, index, drop = TRUE]
+    dpr <- g %in% unique(g[duplicated(g)])
+    dpex <- expr[dpr,]
+    if(nrow(dpex) == 0) return(expr)  
+    expr <- expr[!dpr,]
+    
+    if(method == "kmax"){
+      dpex <- dpex %>%
+            dplyr::group_by(across(all_of(index))) %>%
+            dplyr::slice_max(rowSums(across(where(is.numeric))), n = 1, with_ties = FALSE) %>%
+            dplyr::ungroup()
+    }else if(method == "max"){
+       dpex <- dpex %>%
+            dplyr::group_by(across(all_of(index))) %>%
+            dplyr::summarise(across(everything(), ~if(is.numeric(.)) max(.) else first(.)), .groups = "drop")
+    }else if(method == "mean"){
+        dpex <- dpex %>%
+            dplyr::group_by(across(all_of(index))) %>%
+            dplyr::summarise(across(everything(), ~if(is.numeric(.)) mean(.) else first(.)), .groups = "drop")
+    }
+    
+    dpex <- as.data.frame(dpex)
+    rownames(dpex) <- NULL
+    return(rbind(expr, dpex))
+}

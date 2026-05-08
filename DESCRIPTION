@@ -1,0 +1,28 @@
+Package: seqTools
+Type: Package
+Title: Tools for analyzing common sequencing data.
+Version: 0.1.13
+Authors@R: c(
+    person(
+      "Flyingleaf",
+      email = "12211914@mail.sustech.edu.cn",
+      role = c("cre")
+    )
+  )
+Description: Useful analysis scripts for RNA/single cell RNA sequencing data.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    DESeq2,
+    edgeR,
+    limma,
+    parallel,
+    stats,
+    ggraph
+Depends: 
+    R (>= 3.5),
+    Seurat,
+    ggplot2,
+    dplyr
+RoxygenNote: 7.3.3
