@@ -838,8 +838,9 @@ quick_data_reader <- function(dir_path, sep, pattern_index, min.cells = 3, min.f
 #'
 #' @examples
 
-sc_cor <- function(scRNA, genes.check, group.by, ident.group, target.group,k = 25, max_shared = 10, min.cells = 100, name = "test", method = "pearson"){
+sc_cor <- function(scRNA, genes.check, group.by, ident.group, reduction = NULL, target.group,k = 25, max_shared = 10, min.cells = 100, name = "test", method = "pearson"){
 
+    if(is.null(reduction)) reduction <- if ("harmony" %in% names(scRNA@reductions)) "harmony" else "pca"
     if(length(genes.check) < 2){
       stop("Please check the gene.check input")
     }
@@ -855,7 +856,7 @@ sc_cor <- function(scRNA, genes.check, group.by, ident.group, target.group,k = 2
       wg <- hdWGCNA::MetacellsByGroups(
         seurat_obj = wg,
         group.by = group.by,
-        reduction = 'harmony', 
+        reduction = reduction, 
         k = k, 
         max_shared = max_shared, 
         ident.group = ident.group, 
