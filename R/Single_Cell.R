@@ -17,8 +17,8 @@ sc_filter <- function(scRNA, s = 0.02) {
     md = median(xl)
     w = mad(xl, constant = 1)
     
-    return(c(lower = 10^(md - max(3, 5 - max(0, cl - 2)) * w),
-      upper = 10^(md + max(3, 4 - max(0, ch - 2)) * w)))
+    return(c(lower = 10^(md - max(2.5, 5 - max(0, cl - 2)) * w),
+      upper = 10^(md + max(2.5, 4 - max(0, ch - 2)) * w)))
   }
 
   mt_filter <- function(x, ks = c(10, 15, 20, 25)) {
