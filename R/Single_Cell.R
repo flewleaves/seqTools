@@ -82,7 +82,7 @@ find_doublet <- function(scRNA, samples){
 #' @export
 #'
 #' @examples
-#' dataaList <- scRNA_preprocessing(dataList = dataList, species = "Hs")
+#' dataList <- scRNA_preprocessing(dataList = dataList, species = "Hs")
 scRNA_preprocessing <- function(dataList, species, DoubletFind = T, filter = NULL, progress_saving = F, samples = NULL){
 
     cal = is.null(filter) || length(filter) != 5
@@ -91,7 +91,7 @@ scRNA_preprocessing <- function(dataList, species, DoubletFind = T, filter = NUL
       if(cal){
         dataList[[i]] <- sc_filter(dataList[[i]])
       }else{
-        dataList[[i]] <- subset( dataList[[i]], subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
+        dataList[[i]] <- subset(dataList[[i]], subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
       }
       print(Seurat::VlnPlot(dataList[[i]], features = c("nFeature_RNA","nCount_RNA","percent.mt"),layer = "counts", pt.size = 0.01, ncol = 3))
     }
@@ -125,7 +125,7 @@ scRNA_preprocessing <- function(dataList, species, DoubletFind = T, filter = NUL
 #'
 #' @examples
 #' scRNA <- scRNA_Normalization_Reduction(dataList = dataList, species = "Hs")
-scRNA_Normalization_Reduction <- function(dataList, species, CellCycleScoring = F, vars.to.regress = c('percent.mt'), progress_saving = F){
+scRNA_Normalization_Reduction <- function(dataList, species, CellCycleScoring = F, vars.to.regress = c('percent.mt'), nfeatures = 2000 ,progress_saving = F){
 
   print("Merging objects...")
   if(length(dataList) > 1) {
@@ -137,7 +137,7 @@ scRNA_Normalization_Reduction <- function(dataList, species, CellCycleScoring = 
 
   print("Normalizing and scaling...")
   Merge.Seurat <- NormalizeData(Merge.Seurat, normalization.method = "LogNormalize", scale.factor = 10000)
-  Merge.Seurat<- FindVariableFeatures(object = Merge.Seurat, nfeatures = 2000)
+  Merge.Seurat<- FindVariableFeatures(object = Merge.Seurat, nfeatures = nfeatures)
   #VariableFeaturePlot(Merge.Seurat)
 
   if(CellCycleScoring){
@@ -185,11 +185,11 @@ scRNA_Normalization_Reduction <- function(dataList, species, CellCycleScoring = 
 #'
 #' @examples
 #' scRNA <- scRNA_SCTransform(dataList = dataList)
-scRNA_SCTransform <- function(dataList, vars.to.regress = c('percent.mt'), progress_saving = F){
+scRNA_SCTransform <- function(dataList, vars.to.regress = c('percent.mt'), nfeatures = 3000 ,progress_saving = F){
 
   print("Running SCTransform...")
   if(length(dataList) > 1) {
-    dataList <- lapply(dataList, function(s){SCTransform(s, vars.to.regress = vars.to.regress, verbose = TRUE)})
+    dataList <- lapply(dataList, function(s){SCTransform(s, vars.to.regress = vars.to.regress, variable.features.n = nfeatures,verbose = TRUE)})
     Merge.Seurat <- merge(x = dataList[[1]], y = dataList[-1])
   } else {
     temp <- dataList[[1]]
@@ -246,17 +246,18 @@ scRNA_Integration <- function(Merge.Seurat, SCTransform = F, theta = NULL,progre
 #'
 #' @examples
 #' scRNA <- scRNA_clustering(scRNA, PCs = 25, resolution = seq(0.1, 1.5, 0.1))
-scRNA_clustering <- function(scRNA, PCs = NULL, resolution = seq(0.2,1,0.2), reduction = "harmony", SCTransform = F, n.neighbors = 30L ,progress_saving = F){
+scRNA_clustering <- function(scRNA, PCs = NULL, resolution = seq(0.2,1,0.2), reduction = "harmony", SCTransform = F, k.param = 20,n.neighbors = 30L , min.dist = 0.3, method = "UMAP", progress_saving = F){
+
+  if(!method %in% c("UMAP", "TSNE")){
+    stop("Please check your dimension reduction method")
+  }
 
   if(is.null(PCs)){
-
     stdev <- scRNA@reductions$pca@stdev
     var <- stdev^2
-
     EndVar = 0
-
+    total <- sum(var)
     for(i in 1:length(var)){
-      total <- sum(var)
       numerator <- sum(var[1:i])
       expvar <- numerator/total
       if(EndVar == 0){
@@ -273,25 +274,21 @@ scRNA_clustering <- function(scRNA, PCs = NULL, resolution = seq(0.2,1,0.2), red
     PCNum <- PCs[length(PCs)]
   }
 
-  scRNA <- FindNeighbors(scRNA, dims = 1:PCNum, reduction = reduction)
+  scRNA <- FindNeighbors(scRNA, dims = 1:PCNum, reduction = reduction, k.param = k.param)
   scRNA <- FindClusters(scRNA, verbose = TRUE, resolution = resolution)
-  scRNA <- RunUMAP(scRNA, dims = 1:PCNum, reduction = reduction, n.neighbors = n.neighbors)
-
+  if(method == "UMAP"){
+    scRNA <- RunUMAP(scRNA, dims = 1:PCNum, reduction = reduction, n.neighbors = n.neighbors, min.dist = min.dist)
+  }else if(method == "TSNE"){
+    scRNA <- RunTSNE(scRNA, dims = 1:PCNum, reduction = reduction)
+  }
 
   if(length(resolution) > 1){
-
     print(clustree::clustree(scRNA@meta.data, prefix = ifelse(SCTransform,"SCT_snn_res.","RNA_snn_res.")))
-    resolution = readline(prompt = "Enter the expected resolution : ")
-    resolution <- as.numeric(resolution)
-    scRNA <- FindClusters(scRNA, verbose = TRUE, resolution = resolution)
-    scRNA <- RunUMAP(scRNA, dims = 1:PCNum, reduction = reduction)
   }
 
   print(DimPlot(scRNA))
   if(progress_saving){
-
-    saveRDS(scRNA, "UMAP_scRNA.rds")
-
+    saveRDS(scRNA, "Clustered_scRNA.rds")
   }
   return(scRNA)
 }
@@ -315,7 +312,7 @@ scRNA_clustering <- function(scRNA, PCs = NULL, resolution = seq(0.2,1,0.2), red
 #'
 #' @examples
 #' scRNA <- quick_single_cell(dataList = dataList, species = "Hs", SCTransform = T)
-quick_single_cell <- function(dataList, species, SCTransform = F, DoubletFind = T, filter = c(300,5000,15),
+quick_single_cell <- function(dataList, species, SCTransform = F, DoubletFind = T, filter = NULL,
                               progress_saving = F, CellCycleScoring = F, vars.to.regress = c('percent.mt'),
                               PCs = NULL, resolution = seq(0.2,1,0.2), samples = NULL){
 
