@@ -22,9 +22,8 @@ sc_filter <- function(scRNA, s = 0.02) {
   }
 
   mt_filter <- function(x, ks = c(10, 15, 20, 25)) {
-    # 如果 x 是小数（0-1），先转为百分数处理，最后返回时转回小数
-    input_is_fraction <- max(x, na.rm = TRUE) <= 1
-    if (input_is_fraction) x <- x * 100
+    frac <- max(x, na.rm = TRUE) <= 1
+    if (frac) x <- x * 100
     
     kp <- sapply(ks, function(k) mean(x <= k))
     dkp <- diff(kp)
@@ -32,13 +31,14 @@ sc_filter <- function(scRNA, s = 0.02) {
     k <- if (is.na(idx)) ks[length(ks)] else ks[idx]
     
     # 返回原始尺度的阈值
-    if (input_is_fraction) k / 100 else k
+    if (frac) k / 100 else k
   }
 
   umi <- scRNA$nCount_RNA
   nf <- scRNA$nFeature_RNA
   mt <- scRNA$percent.mt
   filter <- c(umi_filter(umi, s), umi_filter(nf, s), mt_filter(mt))
+  print(paste("Using filter parameters as below: nCount_RNA min", filter[1], "max", filter[2], "nFeature_RNA min", filter[3], "max", filter[4], "mt.percent less than", filter[5], sep = " "))
   scRNA <- subset(scRNA, subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
   return(scRNA)
 }
