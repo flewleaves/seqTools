@@ -21,7 +21,7 @@ sc_filter <- function(scRNA, s = 0.02) {
       upper = 10^(md + max(2.5, 4 - max(0, ch - 2)) * w)))
   }
 
-  mt_filter <- function(x, ks = c(10, 15, 20, 25)) {
+  mt_filter <- function(x, ks = seq(10,30,5)) {
     frac <- max(x, na.rm = TRUE) <= 1
     if (frac) x <- x * 100
     
