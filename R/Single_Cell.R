@@ -1,7 +1,7 @@
 
 #' @keywords internal
 #' @noRd
-sc_filter <- function(scRNA, s = 0.02) {
+sc_filter <- function(scRNA, s = 0.01) {
   
   umi_filter <- function(x, s){
     xl = log10(x[x > 0])
@@ -18,7 +18,7 @@ sc_filter <- function(scRNA, s = 0.02) {
     w = mad(xl, constant = 1)
     
     return(c(lower = 10^(md - max(2.5, 5 - max(0, cl - 2)) * w),
-      upper = 10^(md + max(2.5, 4 - max(0, ch - 2)) * w)))
+      upper = 10^(md + max(2.5, 5 - max(0, ch - 2)) * w)))
   }
 
   mt_filter <- function(x, ks = seq(10,30,5)) {
