@@ -1,4 +1,47 @@
 
+#' @keywords internal
+#' @noRd
+sc_filter <- function(scRNA, s = 0.02) {
+  
+  umi_filter <- function(x, s){
+    xl = log10(x[x > 0])
+    q = quantile(xl, seq(.01, .99, s), na.rm = T)
+    d = as.numeric(na.omit(stats::filter(diff(q), rep(1/3, 3))))
+    d2 = diff(d)
+    m = length(d2) %/% 2
+    b = median(abs(d2)) + 1e-8
+    
+    cl = max(0, d2[1:m]) / b
+    ch = max(0, -d2[(m+1):length(d2)]) / b
+    
+    md = median(xl)
+    w = mad(xl, constant = 1)
+    
+    return(c(lower = 10^(md - max(3, 5 - max(0, cl - 2)) * w),
+      upper = 10^(md + max(3, 4 - max(0, ch - 2)) * w)))
+  }
+
+  mt_filter <- function(x, ks = c(10, 15, 20, 25)) {
+    # 如果 x 是小数（0-1），先转为百分数处理，最后返回时转回小数
+    input_is_fraction <- max(x, na.rm = TRUE) <= 1
+    if (input_is_fraction) x <- x * 100
+    
+    kp <- sapply(ks, function(k) mean(x <= k))
+    dkp <- diff(kp)
+    idx <- which(dkp < 0.05)[1]
+    k <- if (is.na(idx)) ks[length(ks)] else ks[idx]
+    
+    # 返回原始尺度的阈值
+    if (input_is_fraction) k / 100 else k
+  }
+
+  umi <- scRNA$nCount_RNA
+  nf <- scRNA$nFeature_RNA
+  mt <- scRNA$percent.mt
+  filter <- c(umi_filter(umi, s), umi_filter(nf, s), mt_filter(mt))
+  scRNA <- subset(scRNA, subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
+  return(scRNA)
+}
 
 #'
 #' @param scRNA
@@ -31,7 +74,7 @@ find_doublet <- function(scRNA, samples){
 #' @param dataList Must be a list containing Seurat objects.
 #' @param species "Hs" for human and "Mm" for mouse, used for estimating mitochondria DNA percent.
 #' @param DoubletFind Whether to remove doublets.
-#' @param filter A numeric vector containing filtering criteria for min features, max features, and mitochondria DNA percent.
+#' @param filter A numeric vector containing filtering criteria for min features, max features, min UMI count, max UMI count, and mitochondria DNA percent.
 #' @param progress_saving Whether to save the object after running the function.
 #' @param samples A string of the name in meta.data for grouping cells, only works when DoubletFind = T.
 #'
@@ -39,18 +82,17 @@ find_doublet <- function(scRNA, samples){
 #' @export
 #'
 #' @examples
-#' dataaList <- scRNA_preprocessing(dataList = dataList, species = "Hs", filter = c(200,10000,15))
-scRNA_preprocessing <- function(dataList, species, DoubletFind = T, filter = c(300,5000,15), progress_saving = F, samples = NULL){
+#' dataaList <- scRNA_preprocessing(dataList = dataList, species = "Hs")
+scRNA_preprocessing <- function(dataList, species, DoubletFind = T, filter = NULL, progress_saving = F, samples = NULL){
 
-
-    RNA_min <- filter[1]
-    RNA_max <- filter[2]
-    mt_content <- filter[3]
-
+    cal = is.null(filter) || length(filter) != 5
     for(i in 1:length(dataList)){
-
       dataList[[i]][["percent.mt"]] <- PercentageFeatureSet( dataList[[i]], pattern = ifelse(species == "Mm", "^mt-", "^MT-"))
-      dataList[[i]] <- subset( dataList[[i]], subset = nFeature_RNA > RNA_min & nFeature_RNA < RNA_max & percent.mt < mt_content)
+      if(cal){
+        dataList[[i]] <- sc_filter(dataList[[i]])
+      }else{
+        dataList[[i]] <- subset( dataList[[i]], subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
+      }
       print(Seurat::VlnPlot(dataList[[i]], features = c("nFeature_RNA","nCount_RNA","percent.mt"),layer = "counts", pt.size = 0.01, ncol = 3))
     }
 
