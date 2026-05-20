@@ -902,11 +902,11 @@ check_input <- function(Input, method, log_transformed) {
 
 format_results <- function(results, method, p.value, logFC) {
   col_map <- list(
-    DESeq2 = c(log2FoldChange = "log2FoldChange", padj = "padj"),
-    limma = c(log2FoldChange = "logFC", padj = "adj.P.Val"),
-    edgeR = c(log2FoldChange = "logFC", padj = "FDR"),
-    wilcox = c(log2FoldChange = "log2FoldChange", padj = "padj"),
-    t = c(log2FoldChange = "log2FoldChange", padj = "padj")
+    DESeq2 = c(log2FoldChange = "log2FoldChange", padj = "padj", p.value = "pvalue"),
+    limma  = c(log2FoldChange = "logFC",         padj = "adj.P.Val", p.value = "P.Value"),
+    edgeR  = c(log2FoldChange = "logFC",         padj = "FDR",       p.value = "PValue"),
+    wilcox = c(log2FoldChange = "log2FoldChange", padj = "padj",      p.value = "p.value"),
+    t      = c(log2FoldChange = "log2FoldChange", padj = "padj",      p.value = "p.value")
   )
 
   if (method %in% names(col_map)) {
