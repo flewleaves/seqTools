@@ -3,43 +3,64 @@
 #' @noRd
 sc_filter <- function(scRNA, s = 0.01) {
   
-  umi_filter <- function(x, s){
-    xl = log10(x[x > 0])
-    q = quantile(xl, seq(.01, .99, s), na.rm = T)
-    d = as.numeric(na.omit(stats::filter(diff(q), rep(1/3, 3))))
-    d2 = diff(d)
-    m = length(d2) %/% 2
-    b = median(abs(d2)) + 1e-8
+  umi_filter <- function(x, s) {
+    xl <- log10(x[x > 0]); N <- length(xl)
+    if (N < 100) return(c(lower = 10^min(xl), upper = 10^max(xl)))
     
-    cl = max(0, d2[1:m]) / b
-    ch = max(0, -d2[(m+1):length(d2)]) / b
+    p <- seq(0.01, 0.99, s)
+    qv <- quantile(xl, p, na.rm = TRUE)
+    d <- diff(qv)
     
-    md = median(xl)
-    w = mad(xl, constant = 1)
+    si <- which(p[-length(p)] >= 0.5)
+    ip <- si[which.min(d[si])]
+    md <- quantile(xl, p[ip], na.rm = TRUE)
+    ww <- median(xl[xl >= md] - md)
     
-    return(c(lower = 10^(md - max(2.5, 5 - max(0, cl - 2)) * w),
-      upper = 10^(md + max(2.5, 5 - max(0, ch - 2)) * w)))
+    n <- length(d)
+    w <- max(3, n %/% 15)
+    if (w %% 2 == 0) w <- w + 1
+    ds <- na.omit(as.numeric(stats::filter(d, rep(1/w, w), sides = 2)))
+    acc <- diff(ds) / (ds[-length(ds)] + median(ds))
+    mid <- length(acc) %/% 2; b <- median(abs(acc)) + 1e-8
+    cl <- max(0, acc[1:mid]) / b
+    ch <- max(0, -acc[(mid + 1):length(acc)]) / b
+    
+    c(lower = 10^(md - max(2.5, 5 - max(0, cl - 2)) * ww), 
+      upper = 10^(md + max(2.5, 5 - max(0, ch - 2)) * ww))
   }
 
-  mt_filter <- function(x, ks = seq(10,30,5)) {
+  mt_filter <- function(x, ks = seq(10, 30, 2)) {
     frac <- max(x, na.rm = TRUE) <= 1
     if (frac) x <- x * 100
     
-    kp <- sapply(ks, function(k) mean(x <= k))
-    dkp <- diff(kp)
-    idx <- which(dkp < 0.05)[1]
-    k <- if (is.na(idx)) ks[length(ks)] else ks[idx]
+    N <- length(x)
+    stp <- ks[2] - ks[1]
+    mc <- if (N < 500) 10 else if (N < 5000) 15 else 20
+    tb <- (mc / N) * (stp / 2)
+    th <- 2 * tb
     
-    # 返回原始尺度的阈值
+    dkp <- diff(sapply(ks, function(k) mean(x <= k)))
+    sf <- rev(cummax(rev(dkp)))
+    nm <- c(sf[-1], -Inf)
+    i <- which(dkp < tb & nm < th)[1]
+    k <- if (is.na(i)) ks[length(ks)] else ks[i]
     if (frac) k / 100 else k
   }
 
-  umi <- scRNA$nCount_RNA
-  nf <- scRNA$nFeature_RNA
-  mt <- scRNA$percent.mt
-  filter <- c(umi_filter(umi, s), umi_filter(nf, s), mt_filter(mt))
-  print(paste("Using filter parameters as below: nCount_RNA min", filter[1], "max", filter[2], "nFeature_RNA min", filter[3], "max", filter[4], "mt.percent less than", filter[5], sep = " "))
-  scRNA <- subset(scRNA, subset = nCount_RNA > filter[1] & nCount_RNA < filter[2] & nFeature_RNA > filter[3] & nFeature_RNA < filter[4] & percent.mt < filter[5])
+  fv <- c(umi_filter(scRNA$nCount_RNA, s),
+          umi_filter(scRNA$nFeature_RNA, s),
+          mt_filter(scRNA$percent.mt))
+  names(fv) <- c("nCount_lower", "nCount_upper",
+                 "nFeature_lower", "nFeature_upper", "mt_upper")
+  
+  message("nCount: ", round(fv[1]), "-", round(fv[2]),
+          " | nFeature: ", round(fv[3]), "-", round(fv[4]),
+          " | MT< ", round(fv[5], 1))
+  
+  scRNA <- subset(scRNA,
+    nCount_RNA > fv[1] & nCount_RNA < fv[2] &
+    nFeature_RNA > fv[3] & nFeature_RNA < fv[4] &
+    percent.mt < fv[5])
   return(scRNA)
 }
 
