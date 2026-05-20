@@ -297,8 +297,8 @@ quick_GSEA <- function(
         geneList,
         ifelse(
           species == "Hs",
-          'org.Hs.eg.db::org.Hs.eg.db',
-          'org.Mm.eg.db::org.Mm.eg.db'
+          org.Hs.eg.db::org.Hs.eg.db,
+          org.Mm.eg.db::org.Mm.eg.db
         ),
         keyType = "ENTREZID",
         ont = "ALL",
@@ -380,8 +380,8 @@ quick_enrich <- function(
   if (genesets == "GO") {
     GO_database <- ifelse(
       species == "Mm",
-      'org.Mm.eg.db::org.Mm.eg.db',
-      'org.Hs.eg.db::org.Hs.eg.db'
+      org.Mm.eg.db::org.Mm.eg.db,
+      org.Hs.eg.db::org.Hs.eg.db
     ) #GO分析指定物种，物种缩写索引表详见http://bioconductor.org/packages/release/BiocViews.html#___OrgDb
 
     return(clusterProfiler::enrichGO(
