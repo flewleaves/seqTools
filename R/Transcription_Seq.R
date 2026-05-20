@@ -293,13 +293,10 @@ quick_GSEA <- function(
       )
     }
     if (genesets == "GO") {
+      org_db <- if (species == "Hs") org.Hs.eg.db::org.Hs.eg.db else org.Mm.eg.db::org.Mm.eg.db
       result <- clusterProfiler::gseGO(
         geneList,
-        ifelse(
-          species == "Hs",
-          org.Hs.eg.db::org.Hs.eg.db,
-          org.Mm.eg.db::org.Mm.eg.db
-        ),
+        org_db,
         keyType = "ENTREZID",
         ont = "ALL",
         minGSSize = minGSSize,
